@@ -1,8 +1,12 @@
 from rest_framework.generics import ListAPIView, RetrieveAPIView, RetrieveUpdateAPIView, DestroyAPIView, CreateAPIView
 from datetime import datetime
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 
 from .models import Flight, Booking
-from .serializers import FlightSerializer, BookingSerializer, BookingDetailsSerializer, UpdateBookingSerializer, RegisterSerializer
+from .serializers import FlightSerializer, BookingSerializer, BookingDetailsSerializer, AdminUpdateBookingSerializer, UserUpdateBookingSerializer, RegisterSerializer
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 
 
 class FlightsList(ListAPIView):
@@ -11,9 +15,12 @@ class FlightsList(ListAPIView):
 
 
 class BookingsList(ListAPIView):
-	queryset = Booking.objects.filter(date__gte=datetime.today())
+
 	serializer_class = BookingSerializer
 
+	def get_queryset(self):
+		user = self.request.user
+		return Booking.objects.filter(user=user, date__gte=datetime.today())
 
 class BookingDetails(RetrieveAPIView):
 	queryset = Booking.objects.all()
@@ -24,9 +31,16 @@ class BookingDetails(RetrieveAPIView):
 
 class UpdateBooking(RetrieveUpdateAPIView):
 	queryset = Booking.objects.all()
-	serializer_class = UpdateBookingSerializer
 	lookup_field = 'id'
 	lookup_url_kwarg = 'booking_id'
+
+	def get_serializer_class(self):
+		if self.request.user.is_staff:
+			return AdminUpdateBookingSerializer
+		else:
+			return UserUpdateBookingSerializer
+
+
 
 
 class CancelBooking(DestroyAPIView):
@@ -36,7 +50,7 @@ class CancelBooking(DestroyAPIView):
 
 
 class BookFlight(CreateAPIView):
-	serializer_class = UpdateBookingSerializer
+	serializer_class = AdminUpdateBookingSerializer
 
 	def perform_create(self, serializer):
 		serializer.save(user=self.request.user, flight_id=self.kwargs['flight_id'])
